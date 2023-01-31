@@ -1,0 +1,152 @@
+#! /bin/csh 
+#PBS -l cpunum_prc=6			# number of cpus, default is 1
+#PBS -l memsz_job=800MB 	# EDML 1D: 550 MB  	# memory limit per request 
+#PBS -l cputim_prc=4:00:00	# 1:00:00	# time limit per CPU per request 
+##### Nicht verwenden auf AWI SX8, da sonst cputim_prc auf default 1800 s gesetzt wird!
+#####PBS -l cputim_job=1:00:00	# 1:00:00	# time limit per request 
+#PBS -j o                          	# merge stdout and stderr to stdout
+#PBS -N emice			# job name
+#PBS -V                           # copie environment variables from shell
+#PBS -M oeisen@awi.de	
+
+####explizite Angabe der Queue ist NICHT nötig
+####PBS -e                            	# redirect from stderr
+####PBS -a                # Startzeit [[[[CC]YY]MM]DD]hhmm[.SS]
+
+/bin/echo "job started at: `date`"
+
+# RUNTIME INFORMATION:
+setenv F_FILEINF NO	# information about I/O to stderr {NO|YES|DETAIL}, 
+                        # may increase I/O time if not {NO} 
+setenv F_PROGINF DETAIL	# program information about speed, vectorization
+                        # {NO|YES|DETAIL} 
+setenv F_FTRACE  NO	# analysis list from compile option -ftrace {NO|YES} 
+                        # compile option -ftrace should be used only during
+                        # optimization runs 
+                        # (causes overhead in execution time)
+
+#############################
+# INPUT PARAMETERS FOR RUN:
+
+set run = AW-NEEMS1dep2011_rho+xctS1-kovacs
+
+####### folgendes als log vergangener Laeufe: ######
+### NEEM-S1 04/2014
+	# NEEMS1dep2011_rhoS1-kovacs
+### NEEM-S1 12/2013 ###
+	# NEEMS1dep2011sort_rhoconst_e
+### NEEM 09/2012 ###
+	#NEEM1Dv2_2loofit2epsice3.2_e
+	#NEEM1Dv3_2loofit2epsice3.2_e
+### EFZ ### größere Ausdehnung des Modells in -X
+	# EFZ1D2656_2_epsice3.2_e
+### DOMEF ###
+	#DCECM1D_2epsice3.2_e
+	#ACECM1D_2epsice3.2_e
+### EDML ###
+	#PROP1D_2scafullraw_e
+	#PROP1Dhole_2loofit2epsice3.2_e_ricker_10MHz
+	#PROP1Dhole_2loofit2epsice3.2_e_cutjglac
+	#PROP1Decm_2loofit2epsice3.2_e_cutjglac
+	#PROP1Decm_2loofit2epsice3.2_e
+	#PROP1Dhole_2loo_e2dm
+	#PROP1Dhole_2loofit2epsice3.2_e_cut	
+	#PROP1Dhole_2loofit2epsice3.2_e2dm	
+	#PROP1Dhole_2loofit2epsice3.2_e	
+	#PROP1Dhole_2loo_e
+
+	#PROP1D2004_2loofit2gamden_e2dm
+	#PROP1D2004_2loofit2gamden_e_cut4 PROP1D2004_2gam_e 
+	#PROP1D2004_2goo_e PROP1D2004_2loo_e
+	#PROP1D2004aerowl_2loofit2gamden_e #PROP1D2004_2loofit2gamden_e		
+	#AERO1D_2B_e2dm  PROP1D2004_2sca_e 	
+
+	#set wavelet = ricker_aerointA.wl
+	#set wavelet = ricker_10MHz_intA.wl
+set wavelet = 020006intA.wl
+	#set wavelet = cmp5aintA.wl
+	#set wavelet = ricker_aintA.wl
+	#set wavelet = sinusintA.wl
+	#set wavelet = 983101intA.wl
+	#set wavelet = 983101ENVintA.wl
+	#set wavelet = aero_exp.wl
+#############################
+
+# PARALLELISIERUNG:
+setenv OMP_NUM_THREADS 6
+/bin/echo "OMP_NUM_THREADS:" `printenv OMP_NUM_THREADS`
+
+# DIRECTORY-PFADE:
+set UTF		= /home/sx8/oeisen/		# explizite UTF-dir; auf cross/hurrikan schon durch System gesetzt
+set TMPDIR	= /sx8/scr/awinter/		# explizite TMPDIR-dir; auf cross/hurrikan schon durch System gesetzt
+set exedir	= $UTF/bin			# Verzeichnis executable 	hurrikan: 	$UTF/bin
+set execrossdir	= $UTF/emice_src		# Verzeichnis executable 	cross: /ipf/a/a270012/emice_src	
+set wrkdir	= $TMPDIR			# Arbeitsverzeichnis		cross: $TMPDIR			
+set indir 	= /sx8/user2/awinter/		# Verzeichnis fuer *.des und *.fdr cross: $UTF
+set wldir 	= /sx8/user1/oeisen/AWI		# Verzeichnis fuer Quellsignal
+set outdir	= $wrkdir			# Verzeichnis fuer Ausgabe
+#if ( ! -e ${outdir} ) mkdir ${outdir}	
+
+# JOBKONTROLLAUSGABE:
+set date	= `date +%y%m%d:%H%M%S`
+set ofile	= ${outdir}/${run}.emice.${date}o
+set efile	= ${outdir}/${run}.emice.${date}e
+set oefile 	= ${outdir}/${run}.emice.${date}oe
+
+# INPUT-DATEIEN NACH ARBEITSVERZEICHNIS KOPIEREN:
+cp -f ${wldir}/*.wl ${wrkdir}
+cp -f ${indir}/${run}.fdr ${wrkdir}
+cp -f ${indir}/${run}.des ${wrkdir}
+
+# NEUES EXECUTABLE NACH HURRIKAN KOPIEREN:
+if ( -e ${execrossdir}/emice.x ) then 
+	mv -f ${execrossdir}/emice.x ${exedir}
+        /bin/echo "move ${execrossdir}/emice.x ${exedir} : "
+else
+	/bin/echo "using old emice.x : " 
+endif
+ls -la ${exedir}/emice.x
+
+echo "PBS_WORKDIR: $PBS_O_WORKDIR"        #helpful keywords for the specific request 
+echo "PBS_JOBNAME: $PBS_JOBNAME" 
+echo "PBS_JOBID  : $PBS_JOBID" 
+echo "stdout,error: $oefile"
+echo "current batch directory:"
+pwd
+#cd $PBS_O_WORKDIR
+
+echo " KONTROLLAUSGABE:" > ${oefile}
+echo " ${oefile}" >> ${oefile}
+
+   	#-O ${wrkdir}/${run}outf.nc \
+# PROGRAMMAUFRUF:
+( ${exedir}/emice.x \
+        -f \
+	-r ${run} \
+	-s ${wrkdir}/${wavelet} \
+	-i ${wrkdir} \
+	-o ${wrkdir} \
+      	>  ${ofile} ) \
+	>& ${efile}
+ 
+# DATEIEN AUS ARBEITSVERZEICHNIS NACH AUSGABEVERZEICHNIS KOPIEREN:
+# derzeit identisch: echo -e "DATEIEN AUS ${wrkdir} NACH ${outdir} KOPIEREN ..."
+# cp -f $wrkdir/* $outdir
+echo "DONE"
+
+# ALLE AUSGABEN IN EINE DATEI UND AUFRAEUMEN:
+echo "ALLE AUSGABEN IN EINE DATEI UND AUFRAEUMEN"
+# manuell nachtraeglich: sed 's/^/ /' emice.o93667 >> $oefile
+/bin/echo " ***********************************" 	>> $oefile
+/bin/echo " ${run}.emice.${date}e"	 	>> $oefile
+/bin/echo " ***********************************" 	>> $oefile
+cat $efile 						>> $oefile
+/bin/echo " " 						>> $oefile
+/bin/echo " ************************************" 	>> $oefile
+/bin/echo " ${run}.emice.${date}o" 		>> $oefile
+/bin/echo " ***********************************" 	>> $oefile
+cat $ofile 						>> $oefile
+if ( -e $oefile ) rm -f $ofile $efile 
+
+/bin/echo " job completed at: `date`" 
+
